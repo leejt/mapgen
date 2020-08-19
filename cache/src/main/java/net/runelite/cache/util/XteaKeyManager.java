@@ -41,7 +41,6 @@ public class XteaKeyManager
 	public void loadKeys()
 	{
 		XteaClient xteaClient = new XteaClient();
-
 		try
 		{
 			for (XteaKey key : xteaClient.get())

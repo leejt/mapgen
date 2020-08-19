@@ -79,7 +79,6 @@ public class RegionLoader
 	{
 		int x = i >> 8;
 		int y = i & 0xFF;
-
 		Storage storage = store.getStorage();
 		Archive map = index.findArchiveByName("m" + x + "_" + y);
 		Archive land = index.findArchiveByName("l" + x + "_" + y);
@@ -97,7 +96,6 @@ public class RegionLoader
 
 		Region region = new Region(i);
 		region.loadTerrain(mapDef);
-
 		int[] keys = keyManager.getKeys(i);
 		if (keys != null)
 		{

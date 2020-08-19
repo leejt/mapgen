@@ -26,6 +26,8 @@ package net.runelite.http.api.xtea;
 
 import com.google.gson.JsonParseException;
 import com.google.gson.reflect.TypeToken;
+
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -88,25 +90,9 @@ public class XteaClient
 
 	public List<XteaKey> get() throws IOException
 	{
-		HttpUrl url = RuneLiteAPI.getApiBase().newBuilder()
-			.addPathSegment("xtea")
-			.build();
-
-		Request request = new Request.Builder()
-			.url(url)
-			.build();
-
-		try (Response response = RuneLiteAPI.CLIENT.newCall(request).execute())
-		{
-			InputStream in = response.body().byteStream();
-			// CHECKSTYLE:OFF
-			return RuneLiteAPI.GSON.fromJson(new InputStreamReader(in), new TypeToken<List<XteaKey>>() { }.getType());
-			// CHECKSTYLE:ON
-		}
-		catch (JsonParseException ex)
-		{
-			throw new IOException(ex);
-		}
+		InputStream in = new FileInputStream("/Users/jonathanlee/mapgen/cache/xteas.json");
+		// CHECKSTYLE:OFF
+		return RuneLiteAPI.GSON.fromJson(new InputStreamReader(in), new TypeToken<List<XteaKey>>() { }.getType());
 	}
 
 	public XteaKey get(int region) throws IOException

@@ -60,15 +60,10 @@ public class MapImageDumper
 {
 	private static final Logger logger = LoggerFactory.getLogger(MapImageDumper.class);
 
-	private static final int MAP_SCALE = 4; // this squared is the number of pixels per map square
-	private static final int MAPICON_MAX_WIDTH = 5; // scale minimap icons down to this size so they fit..
-	private static final int MAPICON_MAX_HEIGHT = 6;
+	private static int MAP_SCALE = 8; // this squared is the number of pixels per map square
 	private static final int BLEND = 5; // number of surrounding tiles for ground blending
 
 	private static int[] colorPalette = new ColorPalette(0.9d, 0, 512).getColorPalette();
-
-	private static int[][] TILE_SHAPE_2D = new int[][]{{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, {1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1}, {1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0}, {0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1}, {0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, {1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1}, {1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0}, {1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1}, {1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1}};
-	private static int[][] TILE_ROTATION_2D = new int[][]{{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}, {12, 8, 4, 0, 13, 9, 5, 1, 14, 10, 6, 2, 15, 11, 7, 3}, {15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}, {3, 7, 11, 15, 2, 6, 10, 14, 1, 5, 9, 13, 0, 4, 8, 12}};
 
 	private final int wallColor = (238 + (int) (Math.random() * 20.0D) - 10 << 16) + (238 + (int) (Math.random() * 20.0D) - 10 << 8) + (238 + (int) (Math.random() * 20.0D) - 10);
 	private final int doorColor = 238 + (int) (Math.random() * 20.0D) - 10 << 16;
@@ -101,6 +96,9 @@ public class MapImageDumper
 		objectManager = new ObjectManager(store);
 	}
 
+	public void setScale(int scale) {
+		this.MAP_SCALE = scale;
+	}
 	public void load() throws IOException
 	{
 		loadUnderlays(store);
@@ -115,6 +113,7 @@ public class MapImageDumper
 		areas.load();
 		sprites.load();
 		loadSprites();
+		TileShapes.load();
 	}
 
 	public BufferedImage drawMap(int z)
@@ -140,7 +139,6 @@ public class MapImageDumper
 		drawMap(image, z);
 		drawObjects(image, z);
 		drawMapIcons(image, z);
-
 		return image;
 	}
 
@@ -150,10 +148,17 @@ public class MapImageDumper
 		int pixelsY = Region.Y * MAP_SCALE;
 
 		BufferedImage image = new BufferedImage(pixelsX, pixelsY, BufferedImage.TYPE_INT_RGB);
+		if (z > 0) {
+			Graphics2D g = image.createGraphics();
+
+			g.setBackground(Color.MAGENTA);
+			g.clearRect(0, 0, pixelsX, pixelsY);
+			g.dispose();
+		}
 
 		drawMap(image, 0, 0, z, region);
 		drawObjects(image, 0, 0, region, z);
-		drawMapIcons(image, 0, 0, region, z);
+//		drawMapIcons(image, 0, 0, region, z);
 
 		return image;
 	}
@@ -161,12 +166,26 @@ public class MapImageDumper
 	private void drawMap(BufferedImage image, int drawBaseX, int drawBaseY, int z, Region region)
 	{
 		int[][] map = new int[Region.X * MAP_SCALE][Region.Y * MAP_SCALE];
+		if (z > 0) {
+			for (int i = 0; i < Region.X * MAP_SCALE; i++) {
+				for (int j = 0; j < region.Y * MAP_SCALE; j++) {
+					map[i][j] = 16711935;
+				}
+			}
+		}
 		drawMap(map, region, z);
 
 		int[][] above = null;
 		if (z < 3)
 		{
 			above = new int[Region.X * MAP_SCALE][Region.Y * MAP_SCALE];
+			if (z > 0) {
+				for (int i = 0; i < Region.X * MAP_SCALE; i++) {
+					for (int j = 0; j < region.Y * MAP_SCALE; j++) {
+						above[i][j] = 16711935;
+					}
+				}
+			}
 			drawMap(above, region, z + 1);
 		}
 
@@ -216,7 +235,7 @@ public class MapImageDumper
 			{
 				to.setRGB(drawBaseX * MAP_SCALE + x * MAP_SCALE + i,
 					drawBaseY * MAP_SCALE + y * MAP_SCALE + j,
-					pixels[x * MAP_SCALE + i][y * MAP_SCALE + j]);
+						pixels[x * MAP_SCALE + i][y * MAP_SCALE + j]);
 			}
 		}
 	}
@@ -349,7 +368,7 @@ public class MapImageDumper
 								}
 
 								int shape, rotation;
-								Integer overlayRgb = null;
+							     	Integer overlayRgb = null;
 								if (overlayId == 0)
 								{
 									shape = rotation = 0;
@@ -395,7 +414,6 @@ public class MapImageDumper
 										overlayRgb = colorPalette[var0];
 									}
 								}
-
 								if (shape == 0)
 								{
 									int drawX = xi;
@@ -415,51 +433,31 @@ public class MapImageDumper
 								{
 									int drawX = xi * MAP_SCALE;
 									int drawY = (Region.Y - 1 - yi) * MAP_SCALE;
-									int[] tileShapes = TILE_SHAPE_2D[shape];
-									int[] tileRotations = TILE_ROTATION_2D[rotation];
+									int[] tileShapes = TileShapes.getTileShape(MAP_SCALE, shape);
+									int[] tileRotations = TileShapes.getTileRotation(MAP_SCALE, rotation);
 									if (underlayRgb != 0)
 									{
+										// Overlay
 										int rotIdx = 0;
-										for (int i = 0; i < Region.Z; ++i)
+										for (int i = 0; i < MAP_SCALE/*Region.Z*/; i++)
 										{
-											int p1 = tileShapes[tileRotations[rotIdx++]] == 0 ? underlayRgb : overlayRgb;
-											int p2 = tileShapes[tileRotations[rotIdx++]] == 0 ? underlayRgb : overlayRgb;
-											int p3 = tileShapes[tileRotations[rotIdx++]] == 0 ? underlayRgb : overlayRgb;
-											int p4 = tileShapes[tileRotations[rotIdx++]] == 0 ? underlayRgb : overlayRgb;
-											pixels[drawX + 0][drawY + i] = p1;
-											pixels[drawX + 1][drawY + i] = p2;
-											pixels[drawX + 2][drawY + i] = p3;
-											pixels[drawX + 3][drawY + i] = p4;
+											for (int s = 0; s < MAP_SCALE; s++) {
+												int p1 = tileShapes[tileRotations[rotIdx++]] == 0 ? underlayRgb : overlayRgb;
+												pixels[drawX + s][drawY + i] = p1;
+											}
 										}
 									}
 									else
 									{
+										// Underlay
 										int rotIdx = 0;
-										for (int i = 0; i < Region.Z; ++i)
+										for (int i = 0; i < MAP_SCALE/*Region.Z*/; i++)
 										{
-											int p1 = tileShapes[tileRotations[rotIdx++]];
-											int p2 = tileShapes[tileRotations[rotIdx++]];
-											int p3 = tileShapes[tileRotations[rotIdx++]];
-											int p4 = tileShapes[tileRotations[rotIdx++]];
-
-											if (p1 != 0)
-											{
-												pixels[drawX + 0][drawY + i] = overlayRgb;
-											}
-
-											if (p2 != 0)
-											{
-												pixels[drawX + 1][drawY + i] = overlayRgb;
-											}
-
-											if (p3 != 0)
-											{
-												pixels[drawX + 2][drawY + i] = overlayRgb;
-											}
-
-											if (p4 != 0)
-											{
-												pixels[drawX + 3][drawY + i] = overlayRgb;
+											for (int s = 0; s < MAP_SCALE; s++) {
+												int p1 = tileShapes[tileRotations[rotIdx++]];
+												if (p1 != 0) {
+													pixels[drawX + s][drawY + i] = overlayRgb;
+												}
 											}
 										}
 									}
@@ -487,10 +485,8 @@ public class MapImageDumper
 	private void drawObjects(BufferedImage image, int drawBaseX, int drawBaseY, Region region, int z)
 	{
 		Graphics2D graphics = image.createGraphics();
-
 		for (Location location : region.getLocations())
 		{
-
 			int rotation = location.getOrientation();
 			int type = location.getType();
 
@@ -554,31 +550,27 @@ public class MapImageDumper
 					{
 						if (rotation == 0)
 						{
-							image.setRGB(drawX + 0, drawY + 0, rgb);
-							image.setRGB(drawX + 0, drawY + 1, rgb);
-							image.setRGB(drawX + 0, drawY + 2, rgb);
-							image.setRGB(drawX + 0, drawY + 3, rgb);
+							for (int s = 0; s < MAP_SCALE; s++) {
+								image.setRGB(drawX + 0, drawY + s, rgb);
+							}
 						}
 						else if (rotation == 1)
 						{
-							image.setRGB(drawX + 0, drawY + 0, rgb);
-							image.setRGB(drawX + 1, drawY + 0, rgb);
-							image.setRGB(drawX + 2, drawY + 0, rgb);
-							image.setRGB(drawX + 3, drawY + 0, rgb);
+							for (int s = 0; s < MAP_SCALE; s++) {
+								image.setRGB(drawX + s, drawY + 0, rgb);
+							}
 						}
 						else if (rotation == 2)
 						{
-							image.setRGB(drawX + 3, drawY + 0, rgb);
-							image.setRGB(drawX + 3, drawY + 1, rgb);
-							image.setRGB(drawX + 3, drawY + 2, rgb);
-							image.setRGB(drawX + 3, drawY + 3, rgb);
+							for (int s = 0; s < MAP_SCALE; s++) {
+								image.setRGB(drawX + (MAP_SCALE-1), drawY + s, rgb);
+							}
 						}
 						else if (rotation == 3)
 						{
-							image.setRGB(drawX + 0, drawY + 3, rgb);
-							image.setRGB(drawX + 1, drawY + 3, rgb);
-							image.setRGB(drawX + 2, drawY + 3, rgb);
-							image.setRGB(drawX + 3, drawY + 3, rgb);
+							for (int s = 0; s < MAP_SCALE; s++) {
+								image.setRGB(drawX + s, drawY + (MAP_SCALE-1), rgb);
+							}
 						}
 					}
 
@@ -590,15 +582,15 @@ public class MapImageDumper
 						}
 						else if (rotation == 1)
 						{
-							image.setRGB(drawX + 3, drawY + 0, rgb);
+							image.setRGB(drawX + (MAP_SCALE-1), drawY + 0, rgb);
 						}
 						else if (rotation == 2)
 						{
-							image.setRGB(drawX + 3, drawY + 3, rgb);
+							image.setRGB(drawX + (MAP_SCALE-1), drawY + (MAP_SCALE-1), rgb);
 						}
 						else if (rotation == 3)
 						{
-							image.setRGB(drawX + 0, drawY + 3, rgb);
+							image.setRGB(drawX + 0, drawY + (MAP_SCALE-1), rgb);
 						}
 					}
 
@@ -606,31 +598,27 @@ public class MapImageDumper
 					{
 						if (rotation == 3)
 						{
-							image.setRGB(drawX + 0, drawY + 0, rgb);
-							image.setRGB(drawX + 0, drawY + 1, rgb);
-							image.setRGB(drawX + 0, drawY + 2, rgb);
-							image.setRGB(drawX + 0, drawY + 3, rgb);
+							for (int s = 0; s < MAP_SCALE; s++) {
+								image.setRGB(drawX + 0, drawY + s, rgb);
+							}
 						}
 						else if (rotation == 0)
 						{
-							image.setRGB(drawX + 0, drawY + 0, rgb);
-							image.setRGB(drawX + 1, drawY + 0, rgb);
-							image.setRGB(drawX + 2, drawY + 0, rgb);
-							image.setRGB(drawX + 3, drawY + 0, rgb);
+							for (int s = 0; s < MAP_SCALE; s++) {
+								image.setRGB(drawX + s, drawY + 0, rgb);
+							}
 						}
 						else if (rotation == 1)
 						{
-							image.setRGB(drawX + 3, drawY + 0, rgb);
-							image.setRGB(drawX + 3, drawY + 1, rgb);
-							image.setRGB(drawX + 3, drawY + 2, rgb);
-							image.setRGB(drawX + 3, drawY + 3, rgb);
+							for (int s = 0; s < MAP_SCALE; s++) {
+								image.setRGB(drawX + (MAP_SCALE-1), drawY + s, rgb);
+							}
 						}
 						else if (rotation == 2)
 						{
-							image.setRGB(drawX + 0, drawY + 3, rgb);
-							image.setRGB(drawX + 1, drawY + 3, rgb);
-							image.setRGB(drawX + 2, drawY + 3, rgb);
-							image.setRGB(drawX + 3, drawY + 3, rgb);
+							for (int s = 0; s < MAP_SCALE; s++) {
+								image.setRGB(drawX + s, drawY + (MAP_SCALE-1), rgb);
+							}
 						}
 					}
 				}
@@ -655,25 +643,23 @@ public class MapImageDumper
 					continue;
 				}
 
-				int rgb = 0xEE_EEEE;
+				int rgb = wallColor;
 				if (hash > 0)
 				{
-					rgb = 0xEE_0000;
+					rgb = doorColor;
 				}
 
 				if (rotation != 0 && rotation != 2)
 				{
-					image.setRGB(drawX + 0, drawY + 0, rgb);
-					image.setRGB(drawX + 1, drawY + 1, rgb);
-					image.setRGB(drawX + 2, drawY + 2, rgb);
-					image.setRGB(drawX + 3, drawY + 3, rgb);
+					for (int s = 0; s < MAP_SCALE; s++) {
+						image.setRGB(drawX + s, drawY + s, rgb);
+					}
 				}
 				else
 				{
-					image.setRGB(drawX + 0, drawY + 3, rgb);
-					image.setRGB(drawX + 1, drawY + 2, rgb);
-					image.setRGB(drawX + 2, drawY + 1, rgb);
-					image.setRGB(drawX + 3, drawY + 0, rgb);
+					for (int s = 0; s < MAP_SCALE; s++) {
+						image.setRGB(drawX + s, drawY + (MAP_SCALE-1-s), rgb);
+					}
 				}
 			}
 			else if (type == 22 || (type >= 9 && type <= 11))
@@ -689,6 +675,7 @@ public class MapImageDumper
 
 		graphics.dispose();
 	}
+
 
 	private void drawObjects(BufferedImage image, int z)
 	{
@@ -975,7 +962,7 @@ public class MapImageDumper
 					spriteImage.setRGB(0, 0, sprite.getWidth(), sprite.getHeight(), sprite.getPixels(), 0, sprite.getWidth());
 
 					// scale image down so it fits
-					Image scaledImage = spriteImage.getScaledInstance(MAPICON_MAX_WIDTH, MAPICON_MAX_HEIGHT, 0);
+					Image scaledImage = spriteImage.getScaledInstance(Math.max(1, spriteImage.getWidth() * MAP_SCALE/4), Math.max(1, spriteImage.getHeight() * MAP_SCALE/4), 0);
 
 					assert scaledMapIcons.containsKey(sprite.getFrame()) == false;
 					scaledMapIcons.put(sprite.getFrame(), scaledImage);
